@@ -1,124 +1,96 @@
-/* TWI Interface with LCD using PCF8574 IC */
-
-/* 
-	
-	PCF8574 has 8-Bit Port for I/O operation 
-	P0 = RS;		//--- Register Select
-	P1 = RW;		//--- Read / Write Operation Select
-	P2 = EN;		//--- Latch to Data Register Enable Pin
-	P3 = Backlight;	//--- LCD Backlight Control
-	P4 = D4;		//--- LCD pin D4
-	P5 = D5;		//--- LCD pin D5
-	P6 = D6;		//--- LCD pin D6
-	P7 = D7;		//--- LCD pin D7	
-
-*/
-
 #include <avr/io.h>
 #include <util/delay.h>
 #include "twi.h"
 #include "twi_lcd.c"
 
 
-#define PCF8574	0x27							//--- Slave Address is 7-Bit and Last Bit is either read or write
+#define MODUL_LCD 0x27
 #define	WRITE 0
 #define READ 1
 
-unsigned char lcd = 0x00;						//--- Declaring a variable as lcd for data operation
+unsigned char lcd = 0x00;
 
-/* Function to Write data in PCF8574 */
-
-void PCF8574_write(unsigned char x)
+// Scriere în modul
+void module_write(unsigned char x)
 {
-		twi_start();							//--- Start Condition 
-		twi_write_cmd((PCF8574 << 1)| WRITE);	//--- SLA+W is Send 0x40 
-		twi_write_dwr(x);						//--- Data to Slave Device
-		twi_stop();								//--- Stop Condition 
+	twi_start();
+	twi_write_cmd((MODUL_LCD << 1)| WRITE);
+	twi_write_dwr(x);
+	twi_stop();
 }
 
 /* Function to Write 4-bit data to LCD */
-
 void twi_lcd_4bit_send(unsigned char x)
 {
-	unsigned char temp = 0x00;					//--- temp variable for data operation
+	unsigned char temp = 0x00;
 	
-	lcd &= 0x0F;								//--- Masking last four bit to prevent the RS, RW, EN, Backlight
-	temp = (x & 0xF0);							//--- Masking higher 4-Bit of Data and send it LCD
-	lcd |= temp;								//--- 4-Bit Data and LCD control Pin
-	lcd |= (0x04);								//--- Latching Data to LCD EN = 1
-	PCF8574_write(lcd);							//--- Send Data From PCF8574 to LCD PORT
-	_delay_us(1);								//--- 1us Delay
-	lcd &= ~(0x04);								//--- Latching Complete
-	PCF8574_write(lcd);							//--- Send Data From PCF8574 to LCD PORT 
-	_delay_us(5);								//--- 5us Delay to Complete Latching
+	lcd &= 0x0F;
+	temp = (x & 0xF0);
+	lcd |= temp;
+	lcd |= (0x04);
+	module_write(lcd);
+	_delay_us(1);
+	lcd &= ~(0x04);
+	module_write(lcd);
+	_delay_us(5);	
 	
-	
-	temp = ((x & 0x0F)<<4);						//--- Masking Lower 4-Bit of Data and send it LCD
-	lcd &= 0x0F;								//--- Masking last four bit to prevent the RS, RW, EN, Backlight					
-	lcd |= temp;								//--- 4-Bit Data and LCD control Pin
-	lcd |= (0x04);								//--- Latching Data to LCD EN = 1
-	PCF8574_write(lcd);							//--- Send Data From PCF8574 to LCD PORT
-	_delay_us(1);								//--- 1us Delay
-	lcd &= ~(0x04);								//--- Latching Complete
-	PCF8574_write(lcd);							//--- Send Data From PCF8574 to LCD PORT
-	_delay_us(5);								//--- 5us Delay to Complete Latching
+	temp = ((x & 0x0F)<<4);
+	lcd &= 0x0F;				
+	lcd |= temp;
+	lcd |= (0x04);
+	module_write(lcd);
+	_delay_us(1);
+	lcd &= ~(0x04);
+	module_write(lcd);
+	_delay_us(5);
 	
 }
 
-/* Function to Write to LCD Command Register */
-
+// Scriere in registrul de comanda al LCD-ului
 void twi_lcd_cmd(unsigned char x)
 {
-	lcd = 0x08;									//--- Enable Backlight Pin
-	lcd &= ~(0x01);								//--- Select Command Register By RS = 0
-	PCF8574_write(lcd);							//--- Send Data From PCF8574 to LCD PORT
-	twi_lcd_4bit_send(x);						//--- Function to Write 4-bit data to LCD 
+	lcd = 0x08;
+	lcd &= ~(0x01);
+	module_write(lcd);
+	twi_lcd_4bit_send(x);
 	
 }
 
 /* Function to Write to LCD Command Register */
-
 void twi_lcd_dwr(unsigned char x)
 {
-	lcd |= 0x09;								//--- Enable Backlight Pin & Select Data Register By RS = 1
-	PCF8574_write(lcd);							//--- Send Data From PCF8574 to LCD PORT	
-	twi_lcd_4bit_send(x);						//--- Function to Write 4-bit data to LCD
+	lcd |= 0x09;			// Lumina de fundal
+	module_write(lcd);
+	twi_lcd_4bit_send(x);
 }
 
-/* Function to Send String of Data */
-
+// Trimitere string
 void twi_lcd_msg(char *c)
 {
-	while (*c != '\0')							//--- Check Pointer for Null
-	twi_lcd_dwr(*c++);							//--- Send the String of Data
+	while (*c != '\0')
+	twi_lcd_dwr(*c++);
 }
 
-/* Function to Execute Clear LCD Command */
-
+// Clear la display
 void twi_lcd_clear()
 {
 	twi_lcd_cmd(0x01);
 }
 
-/* Function to Initialize LCD in 4-Bit Mode, Cursor Setting and Row Selection */
-
+// Initializare LCD cu 4-Bit Mode, setare cursor și pozitionare pe linie si coloană
 void twi_lcd_init()
 {	
-	lcd = 0x04;						//--- EN = 1 for 25us initialize Sequence
-	PCF8574_write(lcd);
+	lcd = 0x04;
+	module_write(lcd);
 	_delay_us(25);
 	
-	twi_lcd_cmd(0x03);				//--- Initialize Sequence
-	twi_lcd_cmd(0x03);				//--- Initialize Sequence
-	twi_lcd_cmd(0x03);				//--- Initialize Sequence
-	twi_lcd_cmd(0x02);				//--- Return to Home
-	twi_lcd_cmd(0x28);				//--- 4-Bit Mode 2 - Row Select
-	twi_lcd_cmd(0x0F);				//--- Cursor on, Blinking on
-	twi_lcd_cmd(0x01);				//--- Clear LCD
-	twi_lcd_cmd(0x06);				//--- Auto increment Cursor
-	twi_lcd_cmd(0x80);				//--- Row 1 Column 1 Address
-	// twi_lcd_msg((char*)"CODE-N-LOGIC");	//--- String Send to LCD
-	// _delay_ms(1000);				//--- 1s Delay
-	// twi_lcd_clear();				//--- Clear LCD
-	// twi_lcd_cmd(0x80);				//--- Row 1 Column 1 Address
+	twi_lcd_cmd(0x03);
+	twi_lcd_cmd(0x03);
+	twi_lcd_cmd(0x03);
+	twi_lcd_cmd(0x02);
+	twi_lcd_cmd(0x28);
+	twi_lcd_cmd(0x0F);				// Cursor, efect de blink
+	twi_lcd_cmd(0x01);				// Clear display LCD
+	twi_lcd_cmd(0x06);				// Auto-incrementare cursor la scriere
+	twi_lcd_cmd(0x80);				// Selectare linia 1, coloana 1
 }

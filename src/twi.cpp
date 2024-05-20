@@ -2,13 +2,17 @@
 #include <avr/io.h>
 
 void twi_init() {
-	DDRC |= (1 << PC5);
-	PORTC |= (1 << PC5);
+	DDRC |= (1 << PC5); // Setez direcția pinului 5 din port C
+						// ca pin de ieșire.
+
+	PORTC |= (1 << PC5); // Setez pinul PC5 - semnal înalt
+						// SCL setat pentru I2C în starea idle.
 
 	TWCR = 0;
 
-	TWBR = ((F_CPU / 100000) - 16) / 2;
-	TWSR &= ~((1 << TWPS0) | (1 << TWPS1));
+	TWBR = ((F_CPU / 100000) - 16) / 2;  // Rata de transfer
+
+	TWSR &= ~((1 << TWPS0) | (1 << TWPS1));	// Prescaler 1
 }
 
 void twi_start(void) {
@@ -39,15 +43,12 @@ void twi_discover() {
 }
 
 void twi_read_ack(uint8_t *data) {
-    // TODO 1: Read a byte of data with ACK enabled 
 	TWCR = (1 << TWINT) | (1 << TWEN) | (1 << TWEA);
 	while(bit_is_clear(TWCR, TWINT));
     *data = TWDR;
 }
 
 void twi_read_nack(uint8_t *data) {
-    // TODO 1: Read a byte of data with ACK disabled 
-	// same as above, but don't send acknowledge
     TWCR = (1 << TWINT) | (1 << TWEN);
 	while(bit_is_clear(TWCR, TWINT));
     *data = TWDR;

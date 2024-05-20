@@ -1,4 +1,3 @@
-// #include <Arduino.h>
 #include <stdio.h>
 #include <util/delay.h>
 #include <avr/io.h>
@@ -11,11 +10,11 @@
 
 #define BAUD_RATE 9600
 
-#define STARTING_POS_OX 2250  // Middle position for servo (1.5ms pulse width)
+#define STARTING_POS_OX 2250
 #define STRATING_POS_OY 1600
 
-#define MIN_LEFT 1000         // Minimum pulse width (1ms)
-#define MAX_RIGHT 4000       // Maximum pulse width (2ms)
+#define MIN_LEFT 1000
+#define MAX_RIGHT 4000
 
 #define MIN_UP 1000
 #define MAX_DOWN 1600
@@ -33,33 +32,45 @@
 #define GOOD_POSITION 4
 
 void init_servo1() {
-    DDRB |= (1 << DDB1); // PB1 (pin 9 on Arduino Uno)
+    DDRB |= (1 << DDB1); // PB 2 iesire
 
-    // Configure Timer1 for PWM, mode 14 (Fast PWM with ICR1 as top)
-    TCCR1A |= (1 << COM1A1) | (1 << WGM11);
-    TCCR1B |= (1 << WGM12) | (1 << WGM13) | (1 << CS11); // Prescaler = 8
+    TCCR1A |= (1 << COM1A1) | (1 << WGM11); // Configurare timer1 cu mod de funcționare
+                                            // Fast PWM
 
-    ICR1 = 20000;  // Set top value for 20ms period (50Hz)
-    OCR1A = STARTING_POS_OX; // Initial position
+
+    // Un servo motor funcționeaza bine intre 50Hz.
+    TCCR1B |= (1 << WGM12) | (1 << WGM13) | (1 << CS11); // Prescaler de 8
+
+    // (16 MHz / 8 = 2MHz; 1 / 0.02 = 50Hz => ICR1 = 2MHz * 0.02 = 40000  
+    // Perioada semnal 20ms
+    // Frecventa este de 50 Hz
+    ICR1 = 40000;
+    OCR1A = STARTING_POS_OX; // Poziție inițială servo.
 }
 
 void init_servo2() {
-    DDRB |= (1 << DDB2); // PB2 (pin 10 on Arduino Uno)
+    DDRB |= (1 << DDB2); 
 
-    // Configure Timer1 for PWM, mode 14 (Fast PWM with ICR1 as top)
     TCCR1A |= (1 << COM1B1);
-    TCCR1B |= (1 << WGM12) | (1 << WGM13) | (1 << CS11); // Prescaler = 8
+    TCCR1B |= (1 << WGM12) | (1 << WGM13) | (1 << CS11);
 
-    ICR1 = 20000;  // Set top value for 20ms period (50Hz)
-    OCR1B = STRATING_POS_OY; // Initial position
+    ICR1 = 40000;  
+    OCR1B = STRATING_POS_OY; 
 }
 
 void tsl2561_init(uint8_t address_tsl2561) {
-    twi_start();
-    twi_write(address_tsl2561 << 1);
-    twi_write(0x00);
-    twi_write(0x03);
-    twi_stop();
+    twi_start(); // Porneste comunicarea twi.
+
+    twi_write(address_tsl2561 << 1); // Trimite adresa senzorului 
+                                    // și seteaza bitul de acțiune pe 0
+                                    // pentru scriere.
+
+    twi_write(0x00);    // Registrul de comanda al senzorului TSL2561
+                        // 0x00 -> urmeaza o scriere în acesta.
+
+    twi_write(0x03); // Activare senzor.
+
+    twi_stop(); // Oprește comunicarea twi.
 }
 
 uint32_t tsl2561_read_luminosity(uint8_t address_tsl2561) {
@@ -68,38 +79,43 @@ uint32_t tsl2561_read_luminosity(uint8_t address_tsl2561) {
 
     twi_start();
     twi_write(address_tsl2561 << 1);
-    twi_write(0x80 | 0x20 | 0x0C);
-    twi_stop();
+    twi_write(0x80 | 0x20 | 0x0C);  // Comanda pentru citirea canalului 0 
+    twi_stop();                     // al sensorului.
 
     _delay_ms(13.7);
 
     twi_start();
-    twi_write((address_tsl2561 << 1) | 1);
-    twi_read_ack(&t);
-    twi_read_nack(&x);
-    twi_stop();
+    twi_write((address_tsl2561 << 1) | 1);  // Citire I2C de la senzor.
+    twi_read_ack(&t);                       // 2 citiri succesive
+    twi_read_nack(&x);                  // pentru a construi lumina combinata
+    twi_stop();                 // intercerptată (lumina vizibila + infraroșie)
 
     combined = x;
-    combined <<= 8;
+    combined <<= 8;     // Compunere lumina combinata.
     combined |= t;
 
     twi_start();
     twi_write(address_tsl2561 << 1);
-    twi_write(0x80 | 0x20 | 0x0E);
-    twi_stop();
+    twi_write(0x80 | 0x20 | 0x0E);   // Comanda pentru citirea canalului 1
+    twi_stop();                 
 
     _delay_ms(13.7);
 
     twi_start();
-    twi_write((address_tsl2561 << 1) | 1);
-    twi_read_ack(&t);
-    twi_read_nack(&x);
-    twi_stop();
+    twi_write((address_tsl2561 << 1) | 1);  // Citire I2C de la senzor.
+    twi_read_ack(&t);                       // La fel ca mai sus, 2 citiri,
+    twi_read_nack(&x);                  // dar de aceasta data valoarea
+    twi_stop();                         // din canalul 1 este lumina infraroșie.
 
     infrared_light = x;
-    infrared_light <<= 8;
+    infrared_light <<= 8;   // Compunere lumina infraroșie
     infrared_light |= t;
 
+    // Funcție calcul intensitate luminoasă (Implementare Datasheet TSL2561)
+    /**
+     * Parametri: gain 0: 1x; 1: 16x | tInt 0:13.7ms, 1:100ms, 2:402ms
+     *             combined, infrared, iType T or CS
+     **/
     unsigned int lux = CalculateLux(1, 1, combined, infrared_light, 0);
 
     return lux;
@@ -115,6 +131,9 @@ char check_difference_base_sensors(double sensorLEFT_lux, double sensorRIGHT_lux
     return 0;
 }
 
+/**
+ * Funcție care returneaza direcția în care trebuie mișcat ansamblul prin servo motoare.
+ * **/
 char check_position(double sensorRIGHT_lux, double sensorUP_lux, double sensorLEFT_lux) {
     if (((sensorUP_lux > sensorRIGHT_lux + SENSIBILITY_UP_DOWN) || (sensorUP_lux > sensorLEFT_lux + SENSIBILITY_UP_DOWN))
             && (!check_difference_base_sensors(sensorLEFT_lux, sensorRIGHT_lux))) {
@@ -148,10 +167,8 @@ int main() {
     adc_init_S12SD();
 
     twi_lcd_init();
-    twi_lcd_msg((char*)"Manevra e mare");
 
     twi_lcd_cmd(0xC0);
-    twi_lcd_msg((char*)"Manevra e TARE");
 
     uint16_t uv_value = analog_read_S12SD(0);
     printf("UV value: %d\n", uv_value);
@@ -182,6 +199,9 @@ int main() {
         sprintf(str_lux3, "%.1f", sensorLEFT_lux);
         sprintf(str_uv, "%d", uv_value);
 
+
+        // Afișare pe LCD a valorilor intensităților luminoase receptate
+        // si a valorii UV.
         twi_lcd_clear();
         twi_lcd_cmd(0x80);
         twi_lcd_msg((char*)"R:");

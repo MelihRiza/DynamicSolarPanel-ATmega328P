@@ -1,6 +1,5 @@
 #include <stdio.h>
 
-
 //****************************************************************************
 //
 // Copyright  2004−2005 TAOS, Inc.
@@ -22,48 +21,13 @@
 #define CH_SCALE 10 // scale channel values by 2^10
 #define CHSCALE_TINT0 0x7517 // 322/11 * 2^CH_SCALE
 #define CHSCALE_TINT1 0x0fe7 // 322/81 * 2^CH_SCALE
-//−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
-// T, FN, and CL Package coefficients
-//−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
-// For Ch1/Ch0=0.00 to 0.50
-// Lux/Ch0=0.0304−0.062*((Ch1/Ch0)^1.4)
-// piecewise approximation
-// For Ch1/Ch0=0.00 to 0.125:
-// Lux/Ch0=0.0304−0.0272*(Ch1/Ch0)
-//
-// For Ch1/Ch0=0.125 to 0.250:
-// Lux/Ch0=0.0325−0.0440*(Ch1/Ch0)
-//
-// For Ch1/Ch0=0.250 to 0.375:
-// Lux/Ch0=0.0351−0.0544*(Ch1/Ch0)
-//
-// For Ch1/Ch0=0.375 to 0.50:
-// Lux/Ch0=0.0381−0.0624*(Ch1/Ch0)
-//
-// For Ch1/Ch0=0.50 to 0.61:
-// Lux/Ch0=0.0224−0.031*(Ch1/Ch0)
-//
-// For Ch1/Ch0=0.61 to 0.80:
-// Lux/Ch0=0.0128−0.0153*(Ch1/Ch0)
-//
-// For Ch1/Ch0=0.80 to 1.30:
-// Lux/Ch0=0.00146−0.00112*(Ch1/Ch0)
-//
-// For Ch1/Ch0>1.3:
-// Lux/Ch0=0
+
 //−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 #define K1T 0x0040 // 0.125 * 2^RATIO_SCALE
 #define B1T 0x01f2 // 0.0304 * 2^LUX_SCALE
 #define M1T 0x01be // 0.0272 * 2^LUX_SCALE
 #define K2T 0x0080 // 0.250 * 2^RATIO_SCALE
-// TSL2560, TSL2561
-// LIGHT-TO-DIGITAL CONVERTER
-// TAOS059N − MARCH 2009
-// 25
-// The LUMENOLOGY  Company
 
-// Copyright  2009, TAOS Inc.
-// www.taosinc.com
 #define B2T 0x0214 // 0.0325 * 2^LUX_SCALE
 #define M2T 0x02d1 // 0.0440 * 2^LUX_SCALE
 #define K3T 0x00c0 // 0.375 * 2^RATIO_SCALE
@@ -84,29 +48,6 @@
 #define K8T 0x029a // 1.3 * 2^RATIO_SCALE
 #define B8T 0x0000 // 0.000 * 2^LUX_SCALE
 #define M8T 0x0000 // 0.000 * 2^LUX_SCALE
-//−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
-// CS package coefficients
-//−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
-// For 0 <= Ch1/Ch0 <= 0.52
-// Lux/Ch0 = 0.0315−0.0593*((Ch1/Ch0)^1.4)
-// piecewise approximation
-// For 0 <= Ch1/Ch0 <= 0.13
-// Lux/Ch0 = 0.0315−0.0262*(Ch1/Ch0)
-// For 0.13 <= Ch1/Ch0 <= 0.26
-// Lux/Ch0 = 0.0337−0.0430*(Ch1/Ch0)
-// For 0.26 <= Ch1/Ch0 <= 0.39
-// Lux/Ch0 = 0.0363−0.0529*(Ch1/Ch0)
-// For 0.39 <= Ch1/Ch0 <= 0.52
-// Lux/Ch0 = 0.0392−0.0605*(Ch1/Ch0)
-// For 0.52 < Ch1/Ch0 <= 0.65
-// Lux/Ch0 = 0.0229−0.0291*(Ch1/Ch0)
-// For 0.65 < Ch1/Ch0 <= 0.80
-// Lux/Ch0 = 0.00157−0.00180*(Ch1/Ch0)
-// For 0.80 < Ch1/Ch0 <= 1.30
-// Lux/Ch0 = 0.00338−0.00260*(Ch1/Ch0)
-// For Ch1/Ch0 > 1.30
-// Lux = 0
-//−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−−
 #define K1C 0x0043 // 0.130 * 2^RATIO_SCALE
 #define B1C 0x0204 // 0.0315 * 2^LUX_SCALE
 #define M1C 0x01ad // 0.0262 * 2^LUX_SCALE
@@ -116,14 +57,7 @@
 #define K3C 0x00c8 // 0.390 * 2^RATIO_SCALE
 #define B3C 0x0253 // 0.0363 * 2^LUX_SCALE
 #define M3C 0x0363 // 0.0529 * 2^LUX_SCALE
-// TSL2560, TSL2561
-// LIGHT-TO-DIGITAL CONVERTER
-// TAOS059N − MARCH 2009
-// 26
 
-
-// Copyright  2009, TAOS Inc. The LUMENOLOGY  Company
-// www.taosinc.com
 #define K4C 0x010a // 0.520 * 2^RATIO_SCALE
 #define B4C 0x0282 // 0.0392 * 2^LUX_SCALE
 #define M4C 0x03df // 0.0605 * 2^LUX_SCALE
@@ -139,24 +73,7 @@
 #define K8C 0x029a // 1.3 * 2^RATIO_SCALE
 #define B8C 0x0000 // 0.000 * 2^LUX_SCALE
 #define M8C 0x0000 // 0.000 * 2^LUX_SCALE
-// lux equation approximation without floating point calculations
-//////////////////////////////////////////////////////////////////////////////
-// Routine: unsigned int CalculateLux(unsigned int ch0, unsigned int ch0, int iType)
-//
-// Description: Calculate the approximate illuminance (lux) given the raw
-// channel values of the TSL2560. The equation if implemented
-// as a piece−wise linear approximation.
-//
-// Arguments: unsigned int iGain − gain, where 0:1X, 1:16X
-// unsigned int tInt − integration time, where 0:13.7mS, 1:100mS, 2:402mS,
-// 3:Manual
-// unsigned int ch0 − raw channel value from channel 0 of TSL2560
-// unsigned int ch1 − raw channel value from channel 1 of TSL2560
-// unsigned int iType − package type (T or CS)
-//
-// Return: unsigned int − the approximate illuminance (lux)
-//
-//////////////////////////////////////////////////////////////////////////////
+
 unsigned int CalculateLux(unsigned int iGain, unsigned int tInt, unsigned int ch0,
 unsigned int ch1, int iType)
 {
@@ -177,14 +94,7 @@ unsigned int ch1, int iType)
     break;
     default: // assume no scaling
     chScale = (1 << CH_SCALE);
-    // TSL2560, TSL2561
-    // LIGHT-TO-DIGITAL CONVERTER
-    // TAOS059N − MARCH 2009
-    // 27
-    // The LUMENOLOGY  Company
-
-    // Copyright  2009, TAOS Inc.
-    // www.taosinc.com
+    
     break;
     }
     // scale if gain is NOT 16X
@@ -236,14 +146,7 @@ unsigned int ch1, int iType)
     {b=B6C; m=M6C;}
     else if (ratio <= K7C)
     {b=B7C; m=M7C;}
-    // TSL2560, TSL2561
-    // LIGHT-TO-DIGITAL CONVERTER
-    // TAOS059N − MARCH 2009
-    // 28
 
-
-    // Copyright  2009, TAOS Inc. The LUMENOLOGY  Company
-    // www.taosinc.com
     else if (ratio > K8C)
         {b=B8C; m=M8C;}
         break;
