@@ -21,13 +21,4 @@ void twi_write_dwr(unsigned char data)
 	TWCR=(1<<TWINT)|(1<<TWEN);
 	while (!(TWCR & (1<<TWINT)));	
 	while(TW_STATUS != TW_MT_DATA_ACK);
-
 }
-
-// 
-// void twi_repeated_start()
-// {
-// 	TWCR= (1<<TWINT)|(1<<TWSTA)|(1<<TWEN);		//--- Repeated Start Condition as per Datasheet
-// 	while(!(TWCR & (1<<TWINT)));			
-// 	while(TW_STATUS != TW_REP_START);			//--- Check for the acknowledgment
-// }
